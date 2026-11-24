@@ -1,0 +1,53 @@
+name: FlexFit Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract Android project
+        run: |
+          unzip -q FlexFit_Android_Studio_Project.zip -d source
+          GRADLEW=$(find source -type f -name gradlew | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew was not found in the ZIP."
+            echo "The ZIP may contain source files without the Gradle wrapper."
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          chmod +x "$GRADLEW"
+
+      - name: Build debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug
+
+      - name: Collect APK
+        run: |
+          mkdir -p output
+          find "$PROJECT_DIR" -type f -path "*/build/outputs/apk/*/*.apk" -exec cp {} output/ \;
+          test -n "$(ls -A output)"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlexFit-APK
+          path: output/*.apk
